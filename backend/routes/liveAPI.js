@@ -5,16 +5,21 @@
 const express = require('express');
 const router = express.Router();
 
-// Initialize API Registry
-const APIRegistry = require('../services/apiRegistry');
-const apiRegistry = new APIRegistry();
+// Database service will be accessed via global.db
 
 /**
  * Get all registered APIs
  */
 router.get('/apis', async (req, res) => {
   try {
-    const apis = apiRegistry.getAllAPIs();
+    if (!global.db || !global.db.isHealthy()) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not available'
+      });
+    }
+
+    const apis = await global.db.getAllAPIs();
     res.json({
       success: true,
       data: apis,

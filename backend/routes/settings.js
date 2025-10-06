@@ -28,31 +28,35 @@ const DEFAULT_SETTINGS = {
 };
 
 /**
- * Load settings from file
+ * Load settings from database
  */
 async function loadSettings() {
   try {
-    // Ensure data directory exists
-    await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true });
+    if (!global.db || !global.db.isHealthy()) {
+      return DEFAULT_SETTINGS;
+    }
     
-    const data = await fs.readFile(SETTINGS_FILE, 'utf8');
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+    const settings = await global.db.getAllSettings();
+    return { ...DEFAULT_SETTINGS, ...settings };
   } catch (error) {
-    // Return defaults if file doesn't exist
+    console.error('Failed to load settings from database:', error);
     return DEFAULT_SETTINGS;
   }
 }
 
 /**
- * Save settings to file
+ * Save settings to database
  */
 async function saveSettings(settings) {
   try {
-    await fs.mkdir(path.dirname(SETTINGS_FILE), { recursive: true });
-    await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    if (!global.db || !global.db.isHealthy()) {
+      return false;
+    }
+    
+    await global.db.setMultipleSettings(settings);
     return true;
   } catch (error) {
-    console.error('Failed to save settings:', error);
+    console.error('Failed to save settings to database:', error);
     return false;
   }
 }

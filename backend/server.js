@@ -3,22 +3,32 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const { chromium } = require('playwright');
 const ScriptGenerator = require('./services/scriptGenerator');
+const DatabaseService = require('./services/database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Initialize services
 const scriptGenerator = new ScriptGenerator();
+const db = new DatabaseService();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// In-memory storage for recordings (in production, use a database)
-const recordings = new Map();
+// Initialize database connection
+let dbInitialized = false;
+db.initialize().then(success => {
+  dbInitialized = success;
+  if (success) {
+    console.log('✅ Database service initialized');
+  } else {
+    console.log('❌ Database service failed to initialize');
+  }
+});
 
-// Make recordings globally accessible for API export
-global.recordings = recordings;
+// Make database globally accessible for API export
+global.db = db;
 
 // Import API export routes
 const apiExportRoutes = require('./routes/apiExport');
@@ -33,30 +43,29 @@ const settingsRoutes = require('./routes/settings');
 app.use('/api/settings', settingsRoutes);
 
 // API Routes
-
 // Create a new recording
 app.post('/api/recordings', async (req, res) => {
   try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+
     const { interactions, metadata } = req.body;
-    const recordingId = uuidv4();
+    const title = metadata?.title || `Recording ${new Date().toISOString()}`;
+    const description = metadata?.description || 'Browser automation recording';
     
-    const recording = {
-      id: recordingId,
+    const recording = await db.createRecording({
+      title,
+      description,
       interactions,
-      metadata: metadata || {},
-      status: 'processing',
-      createdAt: new Date().toISOString(),
-      script: null,
-      error: null
-    };
-    
-    recordings.set(recordingId, recording);
+      metadata: metadata || {}
+    });
     
     // Process the recording asynchronously
-    processRecording(recordingId, interactions);
+    processRecording(recording.id, interactions);
     
     res.json({ 
-      id: recordingId, 
+      id: recording.id, 
       status: 'processing',
       message: 'Recording submitted for processing'
     });
@@ -66,35 +75,55 @@ app.post('/api/recordings', async (req, res) => {
   }
 });
 
-// Get a specific recording
-app.get('/api/recordings/:id', (req, res) => {
-  const { id } = req.params;
-  const recording = recordings.get(id);
-  
-  if (!recording) {
-    return res.status(404).json({ error: 'Recording not found' });
+// Get all recordings
+app.get('/api/recordings', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+
+    const recordings = await db.getAllRecordings();
+    res.json(recordings);
+  } catch (error) {
+    console.error('Error fetching recordings:', error);
+    res.status(500).json({ error: 'Failed to fetch recordings' });
   }
-  
-  res.json(recording);
 });
 
-// Get all recordings
-app.get('/api/recordings', (req, res) => {
-  const allRecordings = Array.from(recordings.values()).map(recording => ({
-    id: recording.id,
-    status: recording.status,
-    createdAt: recording.createdAt,
-    metadata: recording.metadata
-  }));
-  
-  res.json(allRecordings);
+// Get a specific recording
+app.get('/api/recordings/:id', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+
+    const recording = await db.getRecording(req.params.id);
+    
+    if (!recording) {
+      return res.status(404).json({ error: 'Recording not found' });
+    }
+    
+    res.json(recording);
+  } catch (error) {
+    console.error('Error fetching recording:', error);
+    res.status(500).json({ error: 'Failed to fetch recording' });
+  }
+});allRecordings);
 });
 
 // Process recording and generate script
 async function processRecording(recordingId, interactions) {
   try {
-    const recording = recordings.get(recordingId);
-    if (!recording) return;
+    if (!dbInitialized) {
+      console.error('Database not initialized for processing recording:', recordingId);
+      return;
+    }
+
+    const recording = await db.getRecording(recordingId);
+    if (!recording) {
+      console.error('Recording not found:', recordingId);
+      return;
+    }
     
     console.log(`Processing recording ${recordingId} with ${interactions.length} interactions`);
     
@@ -105,17 +134,25 @@ async function processRecording(recordingId, interactions) {
     );
     
     // Update recording with generated automation package
-    recording.status = 'completed';
-    recording.automationPackage = automationPackage;
-    recording.completedAt = new Date().toISOString();
-    
-    recordings.set(recordingId, recording);
+    await db.updateRecording(recordingId, {
+      status: 'completed',
+      automation_package: automationPackage,
+      completed_at: new Date()
+    });
     
     // Auto-register API if automation package includes API export
     try {
       if (automationPackage.apiPackage) {
-        const apiRegistry = liveAPIRoutes.apiRegistry;
-        await apiRegistry.registerAPI(recording, automationPackage, automationPackage.apiPackage);
+        const apiData = {
+          recording_id: recordingId,
+          name: recording.title || `API for ${recordingId}`,
+          description: recording.description || 'Generated API from browser automation',
+          version: '1.0.0',
+          endpoints: automationPackage.apiPackage.endpoints || [],
+          openapi_spec: automationPackage.apiPackage.openapi || {}
+        };
+        
+        await db.createAPI(apiData);
         console.log(`API registered for recording ${recordingId}`);
       }
     } catch (apiError) {
@@ -126,11 +163,14 @@ async function processRecording(recordingId, interactions) {
     
   } catch (error) {
     console.error('Error processing recording:', error);
-    const recording = recordings.get(recordingId);
-    if (recording) {
-      recording.status = 'error';
-      recording.error = error.message;
-      recordings.set(recordingId, recording);
+    
+    try {
+      await db.updateRecording(recordingId, {
+        status: 'error',
+        error_message: error.message
+      });
+    } catch (updateError) {
+      console.error('Failed to update recording with error:', updateError);
     }
   }
 }
@@ -144,12 +184,17 @@ app.get('/api/ai/stats', (req, res) => {
     res.status(500).json({ error: 'Failed to get AI stats' });
   }
 });
-
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.listen(PORT, () => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    database: dbInitialized ? 'connected' : 'disconnected',
+    services: {
+      database: db.isHealthy(),
+      scriptGenerator: true
+    }
+  });
+});ten(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

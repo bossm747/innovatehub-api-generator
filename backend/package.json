@@ -8,7 +8,12 @@
     "dev": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["automation", "browser", "playwright", "ai"],
+  "keywords": [
+    "automation",
+    "browser",
+    "playwright",
+    "ai"
+  ],
   "author": "Manus AI",
   "license": "MIT",
   "dependencies": {
@@ -16,6 +21,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "openai": "^6.1.0",
+    "pg": "^8.16.3",
     "playwright": "^1.55.1",
     "uuid": "^13.0.0"
   }
