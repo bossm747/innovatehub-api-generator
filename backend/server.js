@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { chromium } = require('playwright');
 const ScriptGenerator = require('./services/scriptGenerator');
@@ -15,6 +16,9 @@ const db = new DatabaseService();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the frontend build
+app.use(express.static(path.join(__dirname, 'static')));
 
 // Initialize database connection
 let dbInitialized = false;
@@ -195,6 +199,15 @@ app.get('/health', (req, res) => {
       scriptGenerator: true
     }
   });
-});ten(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+});
+
+// Catch-all handler: send back React's index.html file for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'static', 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Innovatehub API Generator running on port ${PORT}`);
+  console.log(`📊 Database: ${dbInitialized ? 'Connected' : 'Disconnected'}`);
+  console.log(`🌐 Frontend: Serving static files from /static`);
 });
