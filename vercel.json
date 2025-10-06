@@ -1,20 +1,17 @@
 {
   "version": 2,
-  "name": "innovatehub-api-generator",
   "builds": [
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "dist",
+        "buildCommand": "cd frontend && npm run build"
       }
     },
     {
       "src": "backend/server.js",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -31,9 +28,5 @@
     "DATABASE_URL": "postgresql://neondb_owner:npg_08eaQdWqkRTn@ep-solitary-salad-afenjx64-pooler.c-2.us-west-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require",
     "NODE_ENV": "production"
   },
-  "functions": {
-    "backend/server.js": {
-      "maxDuration": 30
-    }
-  }
+  "installCommand": "cd frontend && npm install && cd ../backend && npm install"
 }
