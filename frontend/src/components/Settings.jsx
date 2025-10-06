@@ -15,7 +15,8 @@ import {
   Save,
   RefreshCw,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Code
 } from 'lucide-react'
 
 const Settings = () => {
