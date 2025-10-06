@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { chromium } = require('playwright');
 const ScriptGenerator = require('./services/scriptGenerator');
@@ -15,6 +16,9 @@ const db = new DatabaseService();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the frontend build
+app.use(express.static(path.join(__dirname, 'static')));
 
 // Initialize database connection
 let dbInitialized = false;
@@ -108,7 +112,6 @@ app.get('/api/recordings/:id', async (req, res) => {
     console.error('Error fetching recording:', error);
     res.status(500).json({ error: 'Failed to fetch recording' });
   }
-});allRecordings);
 });
 
 // Process recording and generate script
@@ -191,10 +194,22 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     database: dbInitialized ? 'connected' : 'disconnected',
     services: {
-      database: db.isHealthy(),
+      database: dbInitialized,
       scriptGenerator: true
     }
   });
-});ten(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+});
+
+// Serve the React app for any non-API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, 'static', 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Innovatehub API Generator running on port ${PORT}`);
+  console.log(`📊 Database: ${dbInitialized ? 'Connected' : 'Disconnected'}`);
+  console.log(`🌐 Frontend: Serving static files from /static`);
 });

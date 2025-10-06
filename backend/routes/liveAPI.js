@@ -399,7 +399,7 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-// Export the registry instance for use in other modules
-router.apiRegistry = apiRegistry;
+// Export the router
+// Note: apiRegistry is now handled by the database service
 
 module.exports = router;

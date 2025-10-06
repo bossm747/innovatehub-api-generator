@@ -12,7 +12,8 @@ import {
   Brain,
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  LogOut
 } from 'lucide-react'
 import RecordingControls from './components/RecordingControls'
 import RecordingsList from './components/RecordingsList'
@@ -20,6 +21,7 @@ import ScriptViewer from './components/ScriptViewer'
 import APIExporter from './components/APIExporter'
 import APIRegistry from './components/APIRegistry'
 import Settings from './components/Settings'
+import Login from './components/Login'
 import apiService from './services/api'
 import './App.css'
 
@@ -28,9 +30,21 @@ function App() {
   const [selectedRecording, setSelectedRecording] = useState(null)
   const [backendStatus, setBackendStatus] = useState('checking')
   const [activeTab, setActiveTab] = useState('recorder')
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
+    // Check authentication status
+    const authStatus = localStorage.getItem('innovatehub_auth')
+    const user = localStorage.getItem('innovatehub_user')
+    if (authStatus === 'true' && user) {
+      setIsAuthenticated(true)
+      setCurrentUser(user)
+    }
+
     checkBackendHealth()
+    const interval = setInterval(checkBackendHealth, 30000) // Check every 30 seconds
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -73,6 +87,26 @@ function App() {
       case 'disconnected': return <AlertCircle className="w-4 h-4 text-red-500" />
       default: return <Info className="w-4 h-4 text-yellow-500" />
     }
+  }
+
+  const handleLogin = (success) => {
+    if (success) {
+      setIsAuthenticated(true)
+      setCurrentUser('bossm')
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('innovatehub_auth')
+    localStorage.removeItem('innovatehub_user')
+    setIsAuthenticated(false)
+    setCurrentUser(null)
+    setActiveTab('recorder')
+  }
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />
   }
 
   const getStatusText = () => {
