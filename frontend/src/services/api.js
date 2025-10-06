@@ -2,11 +2,28 @@
  * API Service for Browser Automation Backend
  */
 
-const API_BASE_URL = 'http://localhost:3001/api';
+// Dynamic API URL based on environment
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // In browser environment
+    const { protocol, hostname, port } = window.location;
+    
+    // If we're on localhost, use the development port
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3001/api';
+    }
+    
+    // For production, use the same origin
+    return `${protocol}//${hostname}${port ? `:${port}` : ''}/api`;
+  }
+  
+  // Fallback for server-side rendering
+  return 'http://localhost:3001/api';
+};
 
 class ApiService {
   constructor() {
-    this.baseUrl = API_BASE_URL;
+    this.baseUrl = getApiBaseUrl();
   }
 
   // Helper method for making HTTP requests
@@ -91,9 +108,11 @@ class ApiService {
   // Check backend health
   async checkHealth() {
     try {
-      const response = await fetch(`${this.baseUrl.replace('/api', '')}/health`);
+      const healthUrl = this.baseUrl.replace('/api', '/health');
+      const response = await fetch(healthUrl);
       return response.ok;
     } catch (error) {
+      console.error('Health check failed:', error);
       return false;
     }
   }

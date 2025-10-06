@@ -112,7 +112,6 @@ app.get('/api/recordings/:id', async (req, res) => {
     console.error('Error fetching recording:', error);
     res.status(500).json({ error: 'Failed to fetch recording' });
   }
-});allRecordings);
 });
 
 // Process recording and generate script
@@ -195,14 +194,17 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     database: dbInitialized ? 'connected' : 'disconnected',
     services: {
-      database: db.isHealthy(),
+      database: dbInitialized,
       scriptGenerator: true
     }
   });
 });
 
-// Catch-all handler: send back React's index.html file for client-side routing
-app.get('*', (req, res) => {
+// Serve the React app for any non-API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') {
+    return next();
+  }
   res.sendFile(path.join(__dirname, 'static', 'index.html'));
 });
 
