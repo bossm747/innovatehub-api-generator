@@ -191,3 +191,4 @@ playwright/.cache/
 # Screenshots and videos
 screenshots/
 videos/
+.vercel
